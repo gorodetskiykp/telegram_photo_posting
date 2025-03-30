@@ -1,0 +1,36 @@
+name: Run Python Tests
+
+on:
+  push:
+    branches: [ main, master ]  # Запускать при пуше в main/master
+  pull_request:
+    branches: [ main, master ]  # И при создании PR
+
+jobs:
+  test:
+    runs-on: ubuntu-latest  # Используем последний Ubuntu
+
+    steps:
+      - uses: actions/checkout@v4  # Клонируем репозиторий
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"  # Укажите вашу версию Python
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest  # Установка pytest
+          # Если есть другие зависимости (например, из requirements.txt):
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          python -m pytest -v  # Запуск тестов с подробным выводом
