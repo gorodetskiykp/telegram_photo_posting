@@ -1,0 +1,22 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace  # Удаляет пробелы в концах строк
+      - id: end-of-file-fixer    # Проверяет пустую строку в конце файла
+      - id: check-yaml           # Проверяет синтаксис YAML
+      - id: check-added-large-files  # Блокирует коммит больших файлов
+
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black                # Форматирование кода
+
+  - repo: local                 # Локальные хуки
+    hooks:
+      - id: pytest
+        name: Run pytest
+        entry: python -m pytest
+        language: system
+        types: [python]
+        pass_filenames: false   # Запуск всех тестов, а не только измененных файлов
