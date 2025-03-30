@@ -2,9 +2,9 @@ import asyncio
 import logging
 import random
 import os
-import shutil
 
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 from PIL import Image
 from telegram import Bot
@@ -12,6 +12,16 @@ from telegram.error import TelegramError
 from telegram.request import HTTPXRequest
 
 from creds import TELEGRAM_TOKEN
+from files_search import find_all_files
+
+from settings import (
+    CHAT_ID,
+    IMAGE_EXT,
+    PHOTO_FOLDER,
+    RESIZED_PHOTO_FOLDER,
+    POSTED_PHOTO_FOLDER,
+    TEMP_FOLDER,
+)
 
 # Создание логгера
 logger = logging.getLogger('my_app')
@@ -36,12 +46,6 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
-# Конфигурация
-CHAT_ID = "@ohmyphotos"  # Или ID чата (например, -100123456789)
-PHOTO_FOLDER = "photos"
-RESIZED_PHOTO_FOLDER = "resized_photos"
-POSTED_PHOTO_FOLDER = "posted_photos"
-
 
 async def auto_post_photos():
     is_resized = False
@@ -53,38 +57,24 @@ async def auto_post_photos():
     )
 
     # Получаем список файлов в папке
-    photos = [
-        filename
-        for filename in os.listdir(PHOTO_FOLDER)
-        if filename.endswith(('.jpg', '.png'))
-    ]  # noqa: WPS221
+    photos = find_all_files(IMAGE_EXT, PHOTO_FOLDER)
     if photos:
-        photo = random.choice(photos)  # noqa: S311
-        logger.info(photo)
+        photo_path = random.choice(photos)  # noqa: S311
+        logger.info(photo_path)
     else:
-        for filename in os.listdir(POSTED_PHOTO_FOLDER):
-            src_path = os.path.join(POSTED_PHOTO_FOLDER, filename)
-            dst_path = os.path.join(PHOTO_FOLDER, filename)
-            # Проверяем, что это файл (а не директория)
-            if os.path.isfile(src_path):
-                shutil.move(src_path, dst_path)
-                logger.info(f"Moved: {src_path} -> {dst_path}")
-        photos = [
-            filename
-            for filename in os.listdir(PHOTO_FOLDER)
-            if filename.endswith(('.jpg', '.png'))
-        ]  # noqa: WPS221
-        photo = random.choice(photos)  # noqa: S311
-        logger.info(photo)
-    
-    photo_path = os.path.join(PHOTO_FOLDER, photo)
+        os.rename(PHOTO_FOLDER, TEMP_FOLDER) 
+        os.rename(POSTED_PHOTO_FOLDER, PHOTO_FOLDER)
+        os.rename(TEMP_FOLDER, POSTED_PHOTO_FOLDER)
+        photos = find_all_files(IMAGE_EXT, PHOTO_FOLDER)
+        photo_path = random.choice(photos)  # noqa: S311
+        logger.info(photo_path)
 
     with Image.open(photo_path) as img:
         logger.info(f'{img.size=}')
         if max(img.size) > 4096:
             logger.info('Resize')
             img.thumbnail((2048, 2048))
-            resized_photo_path = os.path.join(RESIZED_PHOTO_FOLDER, photo)
+            resized_photo_path = Path(RESIZED_PHOTO_FOLDER) / photo_path.name
             img.save(resized_photo_path, 'JPEG', quality=100)
             photo_path = resized_photo_path
             is_resized = True
@@ -104,11 +94,11 @@ async def auto_post_photos():
     except TelegramError as e:
         logger.error(f"Error: {e}")
         raise
-    posted_photo_path = os.path.join(POSTED_PHOTO_FOLDER, photo)
+    posted_photo_path = Path(POSTED_PHOTO_FOLDER) / photo_path.name
     if is_resized:
-        photo_path = os.path.join(PHOTO_FOLDER, photo)
+        photo_path = Path(PHOTO_FOLDER) / photo_path.name
         os.remove(resized_photo_path)
-    shutil.move(photo_path, posted_photo_path)
+    photo_path.rename(posted_photo_path)
     logger.info(f"Moved posted photo: {photo_path} -> {posted_photo_path}")
 
 
