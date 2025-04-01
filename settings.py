@@ -6,3 +6,4 @@ POSTED_PHOTO_FOLDER = "posted_photos"
 TEMP_FOLDER = "temp"
 
 IMAGE_EXT = ["jpg", "jpeg"]
+POST_TAGS = "#Москва #Moscow #фото #фотография #photo"

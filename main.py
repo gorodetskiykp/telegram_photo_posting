@@ -12,7 +12,8 @@ from telegram.error import TelegramError
 from telegram.request import HTTPXRequest
 
 from creds import TELEGRAM_TOKEN
-from files_search import find_all_files
+from files_operations import find_all_files
+from photo_operations import get_photocaption
 
 from settings import (
     CHAT_ID,
@@ -21,14 +22,15 @@ from settings import (
     RESIZED_PHOTO_FOLDER,
     POSTED_PHOTO_FOLDER,
     TEMP_FOLDER,
+    POST_TAGS,
 )
 
 # Создание логгера
-logger = logging.getLogger('my_app')
+logger = logging.getLogger("my_app")
 logger.setLevel(logging.DEBUG)  # Минимальный уровень логирования
 
 # Создание форматтера
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 # Создание консольного обработчика
 console_handler = logging.StreamHandler()
@@ -37,7 +39,7 @@ console_handler.setFormatter(formatter)
 
 # Создание файлового обработчика с ротацией
 file_handler = RotatingFileHandler(
-    'main.log', maxBytes=1024*1024, backupCount=5  # 1 MB per file, 5 backups
+    "main.log", maxBytes=1024 * 1024, backupCount=5  # 1 MB per file, 5 backups
 )
 file_handler.setLevel(logging.DEBUG)  # В файл пишем всё
 file_handler.setFormatter(formatter)
@@ -53,7 +55,9 @@ async def auto_post_photos():
     # Инициализация бота
     bot = Bot(
         token=TELEGRAM_TOKEN,
-        request=HTTPXRequest(connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0)
+        request=HTTPXRequest(
+            connect_timeout=30.0, read_timeout=30.0, write_timeout=30.0
+        ),
     )
 
     # Получаем список файлов в папке
@@ -62,7 +66,7 @@ async def auto_post_photos():
         photo_path = random.choice(photos)  # noqa: S311
         logger.info(photo_path)
     else:
-        os.rename(PHOTO_FOLDER, TEMP_FOLDER) 
+        os.rename(PHOTO_FOLDER, TEMP_FOLDER)
         os.rename(POSTED_PHOTO_FOLDER, PHOTO_FOLDER)
         os.rename(TEMP_FOLDER, POSTED_PHOTO_FOLDER)
         photos = find_all_files(IMAGE_EXT, PHOTO_FOLDER)
@@ -70,25 +74,28 @@ async def auto_post_photos():
         logger.info(photo_path)
 
     with Image.open(photo_path) as img:
-        logger.info(f'{img.size=}')
+        logger.info(f"{img.size=}")
         if max(img.size) > 4096:
-            logger.info('Resize')
+            logger.info("Resize")
+            exif = img.getexif()
             img.thumbnail((2048, 2048))
             resized_photo_path = Path(RESIZED_PHOTO_FOLDER) / photo_path.name
-            img.save(resized_photo_path, 'JPEG', quality=100)
+            img.save(resized_photo_path, "JPEG", quality=100, exif=exif)
             photo_path = resized_photo_path
             is_resized = True
     try:
         # Отправка фото в Telegram
-        with open(photo_path, 'rb') as file:
+        with open(photo_path, "rb") as file:
+            caption = get_photocaption(Path(photo_path))
+            logger.info(caption)
             await bot.send_photo(
                 chat_id=CHAT_ID,
                 photo=file,
                 filename=os.path.basename(photo_path),
-                caption="",
+                caption=f"{caption}\n\n{POST_TAGS}",
                 read_timeout=30,
                 write_timeout=30,
-                connect_timeout=30
+                connect_timeout=30,
             )
         logger.info("Posted")
     except TelegramError as e:
