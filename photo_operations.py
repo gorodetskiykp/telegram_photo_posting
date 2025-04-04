@@ -1,8 +1,8 @@
 from datetime import datetime
+from typing import Optional
 
 from PIL import Image
 from PIL.ExifTags import TAGS
-
 from pydantic import BaseModel, Field
 
 
@@ -37,20 +37,20 @@ class EXIF(BaseModel):
         return None
 
     @property
-    def shutter_speed(self) -> str:
+    def shutter_speed(self) -> Optional[str]:
         if self.shutter_speed_float is None:
             return None
         speed = 2 ** (-self.shutter_speed_float)
         return f"{speed:.0f} сек" if speed >= 1 else f"1/{int(round(1 / speed))}"
 
     @property
-    def aperture(self) -> str:
+    def aperture(self) -> Optional[str]:
         if self.aperture_float is None:
             return None
         return f"f/{2 ** (self.aperture_float / 2):.1f}"
 
     @property
-    def date(self) -> str:
+    def date(self) -> Optional[str]:
         if self.date_str is None:
             return None
         dt = datetime.strptime(self.date_str, "%Y:%m:%d %H:%M:%S")
